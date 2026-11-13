@@ -29,6 +29,23 @@ def _yf():
     return yf
 
 
+def clear_cache() -> int:
+    """Hapus semua cache harga & fundamental di disk. Mengembalikan jumlah file yang dihapus."""
+    n = 0
+    if CACHE_DIR.exists():
+        for f in CACHE_DIR.rglob("*"):
+            if f.is_file() and f.suffix in {".pkl", ".json"}:
+                f.unlink(missing_ok=True)
+                n += 1
+    return n
+
+
+def cache_time() -> float | None:
+    """Waktu (epoch) file cache harga terbaru, atau None bila belum ada."""
+    files = list(CACHE_DIR.glob("prices_*.pkl")) if CACHE_DIR.exists() else []
+    return max((f.stat().st_mtime for f in files), default=None)
+
+
 def _fresh(path: Path, ttl: int) -> bool:
     return path.exists() and time.time() - path.stat().st_mtime < ttl
 

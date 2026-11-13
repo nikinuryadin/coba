@@ -81,7 +81,8 @@ Default ±100 saham likuid (LQ45/IDX80/Kompas100) di `idx_screener/tickers.py`. 
 
 - Data Yahoo Finance bersifat EOD/tertunda dan fundamental kadang kosong/terlambat untuk emiten IDX.
   Verifikasi dengan laporan keuangan resmi (idx.co.id) sebelum mengambil keputusan.
-- Cache disimpan di `.cache/` (harga 4 jam, fundamental 24 jam). Pakai `--no-cache` untuk menyegarkan.
+- Cache disimpan di `.cache/` (harga 4 jam, fundamental 24 jam). Di web UI klik **🔄 Perbarui data**;
+  di CLI pakai `--no-cache` untuk menyegarkan.
 - Bukan rekomendasi jual/beli.
 
 ## Tes

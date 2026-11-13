@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
@@ -24,6 +26,13 @@ def load_fundamentals(codes: tuple[str, ...]):
 
 
 with st.sidebar:
+    if st.button("🔄 Perbarui data", type="primary", width="stretch",
+                 help="Ambil ulang harga & fundamental terbaru dari Yahoo Finance"):
+        data.clear_cache()
+        st.cache_data.clear()
+        st.session_state["refreshed"] = True
+        st.rerun()
+    fetched_slot = st.empty()
     st.header("Universe")
     custom = st.text_area("Kode saham (opsional, pisah koma)", placeholder="BBCA, BBRI, TLKM")
     sectors = st.multiselect("Sektor", SECTORS)
@@ -50,6 +59,11 @@ codes = [c.strip().upper().removesuffix(".JK") for c in custom.replace("\n", ","
 codes = tuple(codes or UNIVERSE)
 
 prices = load_prices(codes, period)
+ts = data.cache_time()
+if ts:
+    fetched_slot.caption(f"Data diambil: {datetime.fromtimestamp(ts):%d %b %Y %H:%M}")
+if st.session_state.pop("refreshed", False):
+    st.toast("Data berhasil diperbarui", icon="✅")
 if not prices:
     st.error("Gagal mengambil data harga. Periksa koneksi internet.")
     st.stop()

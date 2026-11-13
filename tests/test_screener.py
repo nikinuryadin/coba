@@ -117,3 +117,15 @@ def test_parse_info_units():
     d2 = parse_info({"dividendYield": 3.5})
     assert d2["div_yield"] == pytest.approx(3.5)
     assert np.isnan(parse_info({})["per"])
+
+
+def test_clear_cache(tmp_path, monkeypatch):
+    from idx_screener import data
+    monkeypatch.setattr(data, "CACHE_DIR", tmp_path)
+    assert data.cache_time() is None
+    (tmp_path / "prices_2y_abc.pkl").write_bytes(b"x")
+    (tmp_path / "fundamentals").mkdir()
+    (tmp_path / "fundamentals" / "BBCA.json").write_text("{}")
+    assert data.cache_time() is not None
+    assert data.clear_cache() == 2
+    assert data.cache_time() is None
