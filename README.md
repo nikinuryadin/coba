@@ -3,7 +3,15 @@
 Screener saham Bursa Efek Indonesia (IDX) berbasis Python — data dari Yahoo Finance (`yfinance`).
 Tersedia sebagai **CLI** dan **web UI (Streamlit)**.
 
-## Instalasi
+## Instalasi cepat (Windows)
+
+1. Pasang Python 3.10+ dari https://www.python.org/downloads/ (centang **Add Python to PATH**).
+2. Unduh repo ini (tombol **Code → Download ZIP**) lalu ekstrak.
+3. Klik dua kali **`install.bat`** (sekali saja, beberapa menit).
+4. Klik dua kali **`jalankan.bat`** — screener terbuka di browser (`http://localhost:8501`).
+   Biarkan jendela hitamnya terbuka; tutup untuk berhenti.
+
+## Instalasi manual
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
