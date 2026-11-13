@@ -47,7 +47,8 @@ with st.sidebar:
     rsi_rng = st.slider("RSI(14)", 0, 100, (0, 100))
     min_value = st.number_input("Nilai transaksi rata-rata 20H minimal (Rp miliar)", 0.0, value=1.0, step=1.0)
     trend = st.multiselect("Kondisi tren", ["above_ma20", "above_ma50", "above_ma200", "uptrend",
-                                             "golden_cross", "macd_cross_up", "new_high_20d"])
+                                             "golden_cross", "macd_cross_up", "new_high_20d",
+                                             "accumulation", "obv_up"])
     if with_fund:
         max_per = st.number_input("PER maksimal (0 = abaikan)", 0.0, value=0.0)
         max_pbv = st.number_input("PBV maksimal (0 = abaikan)", 0.0, value=0.0)
@@ -111,8 +112,8 @@ if filters:
     st.caption("Filter: " + "  •  ".join(filters))
 
 cols = ["name", "sector", "close", "chg_1d", "chg_1w", "chg_1m", "chg_3m", "rsi14", "vol_ratio",
-        "value_avg20", "from_high_52w", "uptrend", "per", "pbv", "roe", "der", "div_yield",
-        "market_cap", "score"]
+        "value_avg20", "atr_pct", "cmf20", "stop", "stop_pct", "target", "from_high_52w", "uptrend",
+        "per", "pbv", "roe", "der", "div_yield", "market_cap", "score"]
 show = result[[c for c in cols if c in result.columns]].copy()
 for c in ("value_avg20", "market_cap"):
     if c in show:
@@ -132,6 +133,13 @@ st.dataframe(
         "vol_ratio": st.column_config.NumberColumn("Vol x", format="%.2f"),
         "value_avg20": st.column_config.NumberColumn("Nilai 20H (M)", format="%.1f"),
         "from_high_52w": st.column_config.NumberColumn("dr High52W %", format="%.1f"),
+        "atr_pct": st.column_config.NumberColumn("ATR %", format="%.1f",
+                                                 help="Rata-rata gerak harian (persen)"),
+        "cmf20": st.column_config.NumberColumn("CMF", format="%.2f",
+                                               help="Money flow 20H: >0.1 akumulasi, <-0.1 distribusi (proksi, bukan broker summary)"),
+        "stop": st.column_config.NumberColumn("Stop", format="%d", help="Harga - 1,5×ATR, dibulatkan ke fraksi"),
+        "stop_pct": st.column_config.NumberColumn("Stop %", format="%.1f"),
+        "target": st.column_config.NumberColumn("Target 2R", format="%d"),
         "per": st.column_config.NumberColumn("PER", format="%.2f"),
         "pbv": st.column_config.NumberColumn("PBV", format="%.2f"),
         "roe": st.column_config.NumberColumn("ROE %", format="%.1f"),
@@ -154,4 +162,6 @@ if not result.empty:
     st.line_chart(df[["Close", "MA20", "MA50", "MA200"]].iloc[-252:])
     st.bar_chart(df["Volume"].iloc[-120:])
 
+st.caption("Stop/Target: stop = harga − 1,5×ATR(14), target = 2× jarak stop (risk:reward 1:2). "
+           "CMF/akumulasi adalah proksi dari harga & volume harian, bukan data broker summary.")
 st.caption("Data dari Yahoo Finance (bisa tertunda ±15 menit / EOD). Bukan rekomendasi jual/beli.")

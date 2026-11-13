@@ -164,3 +164,40 @@ def test_clear_cache(tmp_path, monkeypatch):
     assert data.cache_time() is not None
     assert data.clear_cache() == 2
     assert data.cache_time() is None
+
+
+def test_round_to_tick():
+    from idx_screener.indicators import round_to_tick
+    assert round_to_tick(1003.7) == 1000       # fraksi 5
+    assert round_to_tick(1003.7, up=True) == 1005
+    assert round_to_tick(4987) == 4980         # fraksi 10
+    assert round_to_tick(5012) == 5000         # fraksi 25
+    assert round_to_tick(137.6) == 137         # fraksi 1
+    assert np.isnan(round_to_tick(-5))
+
+
+def test_stop_and_target_valid_ticks():
+    from idx_screener.indicators import tick_size
+    rng = np.random.default_rng(3)
+    closes = 3000 + rng.normal(0, 40, 120).cumsum()
+    t = compute_technicals(make_ohlcv(closes))
+    assert t["stop"] < t["close"] < t["target"]
+    assert t["stop"] % tick_size(t["stop"]) == 0
+    assert t["target"] % tick_size(t["target"]) == 0
+    # target kira-kira 2x jarak stop (selisih karena pembulatan fraksi)
+    assert (t["target"] - t["close"]) == pytest.approx(2 * (t["close"] - t["stop"]), abs=tick_size(t["target"]))
+
+
+def test_cmf_accumulation_vs_distribution():
+    n = 60
+    idx = pd.bdate_range("2025-01-01", periods=n)
+    c = pd.Series(np.linspace(1000, 1050, n), index=idx)
+    # tutup dekat high setiap hari -> akumulasi
+    acc = pd.DataFrame({"Open": c, "High": c * 1.01, "Low": c * 0.97, "Close": c * 1.008, "Volume": 1e6})
+    t = compute_technicals(acc)
+    assert t["cmf20"] > 0.5 and t["accumulation"] and not t["distribution"]
+    # tutup dekat low, harga turun -> distribusi
+    c2 = pd.Series(np.linspace(1050, 1000, n), index=idx)
+    dist = pd.DataFrame({"Open": c2, "High": c2 * 1.03, "Low": c2 * 0.99, "Close": c2 * 0.992, "Volume": 1e6})
+    t2 = compute_technicals(dist)
+    assert t2["cmf20"] < -0.5 and t2["distribution"]
