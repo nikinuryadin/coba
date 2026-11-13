@@ -138,6 +138,11 @@ def compute_technicals(df: pd.DataFrame, cross_lookback: int = 5) -> dict:
         "new_high_20d": bool(len(close) > 20 and last >= close.iloc[-21:-1].max()),
         "bars": len(df),
     }
+    if "Dividends" in df:
+        since = df.index[-1] - pd.Timedelta(days=365)
+        div_ttm = float(df.loc[df.index > since, "Dividends"].fillna(0).sum())
+        out["div_ttm"] = div_ttm
+        out["div_yield_hist"] = div_ttm / last * 100 if last else np.nan
     out["above_ma20"] = bool(last > out["ma20"]) if not np.isnan(out["ma20"]) else False
     out["above_ma50"] = bool(last > out["ma50"]) if not np.isnan(out["ma50"]) else False
     out["above_ma200"] = bool(last > out["ma200"]) if not np.isnan(out["ma200"]) else False

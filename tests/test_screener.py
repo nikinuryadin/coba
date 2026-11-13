@@ -110,22 +110,57 @@ def test_needs_fundamentals():
 
 def test_parse_info_units():
     d = parse_info({"trailingPE": 9.5, "returnOnEquity": 0.21, "debtToEquity": 45.0,
-                    "trailingAnnualDividendYield": 0.052, "shortName": "Bank X"})
+                    "dividendYield": 5.2, "shortName": "Bank X", "financialCurrency": "usd"})
     assert d["roe"] == pytest.approx(21)
     assert d["der"] == pytest.approx(0.45)
-    assert d["div_yield"] == pytest.approx(5.2)
-    d2 = parse_info({"dividendYield": 3.5})
-    assert d2["div_yield"] == pytest.approx(3.5)
+    assert d["fin_currency"] == "USD"
+    # dividendYield dari yfinance baru sudah persen: 0.83 artinya 0,83%, bukan 83%
+    assert parse_info({"dividendYield": 0.83})["div_yield"] == pytest.approx(0.83)
+    # trailingAnnualDividendYield (salah mata uang untuk emiten USD) tidak dipakai
+    assert np.isnan(parse_info({"trailingAnnualDividendYield": 0.0000028})["div_yield"])
     assert np.isnan(parse_info({})["per"])
+    assert parse_info({})["fin_currency"] == "IDR"
+
+
+def test_usd_reporter_pbv_converted_to_idr():
+    """Regresi: ADRO/ITMG/PGAS dll. dulu PBV-nya ribuan karena BVPS dalam USD."""
+    prices = {"USDCO": make_ohlcv(np.full(260, 2480.0)), "IDRCO": make_ohlcv(np.full(260, 1000.0))}
+    fund = pd.DataFrame(
+        {"bvps": [0.175, 800.0], "eps": [396.0, 100.0], "pbv": [14171.0, 1.3], "per": [6.3, 10.0],
+         "div_yield": [np.nan, 4.0], "fx_to_idr": [16000.0, 1.0]},
+        index=pd.Index(["USDCO", "IDRCO"], name="code"),
+    )
+    t = build_table(prices, fund)
+    assert t.loc["USDCO", "pbv"] == pytest.approx(2480 / (0.175 * 16000))  # ~0.89
+    assert t.loc["USDCO", "per"] == pytest.approx(2480 / 396)  # EPS sudah IDR -> tidak dikonversi
+    assert t.loc["IDRCO", "pbv"] == pytest.approx(1.25)
+
+
+def test_usd_reporter_without_fx_has_no_pbv():
+    prices = {"USDCO": make_ohlcv(np.full(30, 2480.0))}
+    fund = pd.DataFrame({"bvps": [0.175], "pbv": [14171.0], "fx_to_idr": [np.nan]},
+                        index=pd.Index(["USDCO"], name="code"))
+    assert np.isnan(build_table(prices, fund).loc["USDCO", "pbv"])
+
+
+def test_dividend_from_history_and_sanity_cap():
+    a = make_ohlcv(np.full(300, 1000.0)); a["Dividends"] = 0.0
+    a.iloc[-100, a.columns.get_loc("Dividends")] = 50.0   # dalam 1 tahun
+    a.iloc[-290, a.columns.get_loc("Dividends")] = 999.0  # > 1 tahun lalu, diabaikan
+    b = make_ohlcv(np.full(300, 1000.0)); b["Dividends"] = 0.0
+    fund = pd.DataFrame({"div_yield": [1.0, 83.0]}, index=pd.Index(["A", "B"], name="code"))
+    t = build_table({"A": a, "B": b}, fund)
+    assert t.loc["A", "div_yield"] == pytest.approx(5.0)  # 50/1000, dari riwayat dividen
+    assert np.isnan(t.loc["B", "div_yield"])  # 83% tidak masuk akal -> dikosongkan
 
 
 def test_clear_cache(tmp_path, monkeypatch):
     from idx_screener import data
     monkeypatch.setattr(data, "CACHE_DIR", tmp_path)
     assert data.cache_time() is None
-    (tmp_path / "prices_2y_abc.pkl").write_bytes(b"x")
-    (tmp_path / "fundamentals").mkdir()
-    (tmp_path / "fundamentals" / "BBCA.json").write_text("{}")
+    (tmp_path / "prices_v2_2y_abc.pkl").write_bytes(b"x")
+    (tmp_path / "fundamentals_v2").mkdir()
+    (tmp_path / "fundamentals_v2" / "BBCA.json").write_text("{}")
     assert data.cache_time() is not None
     assert data.clear_cache() == 2
     assert data.cache_time() is None

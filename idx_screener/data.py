@@ -42,7 +42,7 @@ def clear_cache() -> int:
 
 def cache_time() -> float | None:
     """Waktu (epoch) file cache harga terbaru, atau None bila belum ada."""
-    files = list(CACHE_DIR.glob("prices_*.pkl")) if CACHE_DIR.exists() else []
+    files = list(CACHE_DIR.glob("prices_v2_*.pkl")) if CACHE_DIR.exists() else []
     return max((f.stat().st_mtime for f in files), default=None)
 
 
@@ -59,7 +59,7 @@ def fetch_prices(
     """Unduh OHLCV harian. Mengembalikan {kode: DataFrame[Open, High, Low, Close, Volume]}."""
     CACHE_DIR.mkdir(exist_ok=True)
     digest = hashlib.md5(",".join(sorted(c.upper() for c in codes)).encode()).hexdigest()[:10]
-    key = f"prices_{period}_{digest}.pkl"
+    key = f"prices_v2_{period}_{digest}.pkl"
     cache = CACHE_DIR / key
     if use_cache and _fresh(cache, PRICE_TTL):
         return pd.read_pickle(cache)
@@ -75,6 +75,7 @@ def fetch_prices(
             interval="1d",
             group_by="ticker",
             auto_adjust=False,
+            actions=True,
             threads=True,
             progress=False,
         )
@@ -85,7 +86,8 @@ def fetch_prices(
                 df = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
             except KeyError:
                 continue
-            df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+            cols = [c for c in ("Open", "High", "Low", "Close", "Volume", "Dividends") if c in df]
+            df = df[cols].dropna(subset=["Close"])
             if not df.empty:
                 result[from_yahoo(sym)] = df
     if use_cache and result:
@@ -108,11 +110,10 @@ def parse_info(info: dict) -> dict:
     """Ambil metrik fundamental penting dari Ticker.info dan normalisasi satuannya (persen)."""
     pct = lambda k: _num(info.get(k)) * 100  # noqa: E731  (fraksi -> persen)
 
-    div = _num(info.get("trailingAnnualDividendYield"))
-    if np.isnan(div) or div == 0:
-        dy = _num(info.get("dividendYield"))
-        # yfinance lama memberi fraksi (0.035), yang baru memberi persen (3.5)
-        div = dy / 100 if dy > 1 else dy
+    # yfinance >= 0.2.54 memberi dividendYield dalam PERSEN (3.5 = 3,5%).
+    # trailingAnnualDividendYield tidak dipakai: untuk emiten berlaporan USD
+    # dividen (USD) dibagi harga (IDR) sehingga hasilnya ~0.
+    div = _num(info.get("dividendYield"))
     return {
         "name": info.get("shortName") or info.get("longName"),
         "market_cap": _num(info.get("marketCap")),
@@ -125,11 +126,12 @@ def parse_info(info: dict) -> dict:
         "roa": pct("returnOnAssets"),
         "npm": pct("profitMargins"),
         "der": _num(info.get("debtToEquity")) / 100,  # Yahoo memberi dalam persen
-        "div_yield": div * 100 if not np.isnan(div) else np.nan,
+        "div_yield": div,
         "payout": pct("payoutRatio"),
         "rev_growth": pct("revenueGrowth"),
         "eps_growth": pct("earningsGrowth"),
         "beta": _num(info.get("beta")),
+        "fin_currency": (info.get("financialCurrency") or "IDR").upper(),
     }
 
 
@@ -138,7 +140,7 @@ def fetch_fundamentals(
 ) -> pd.DataFrame:
     """Ambil fundamental per emiten (paralel). Hasil di-cache per emiten selama 24 jam."""
     yf = _yf()
-    fdir = CACHE_DIR / "fundamentals"
+    fdir = CACHE_DIR / "fundamentals_v2"
     fdir.mkdir(parents=True, exist_ok=True)
     rows: dict[str, dict] = {}
     todo = []
@@ -167,5 +169,25 @@ def fetch_fundamentals(
                 (fdir / f"{code}.json").write_text(json.dumps(data))
     df = pd.DataFrame.from_dict(rows, orient="index")
     df.index.name = "code"
+    if "fin_currency" in df:
+        currencies = {c for c in df["fin_currency"].dropna().unique() if c != "IDR"}
+        rates = {c: fetch_fx_rate(c, use_cache) for c in currencies}
+        df["fx_to_idr"] = df["fin_currency"].map(lambda c: 1.0 if c == "IDR" else rates.get(c, np.nan))
     return df
+
+
+def fetch_fx_rate(currency: str, use_cache: bool = True) -> float:
+    """Kurs 1 unit `currency` dalam rupiah (mis. USD -> ~16.000)."""
+    CACHE_DIR.mkdir(exist_ok=True)
+    p = CACHE_DIR / f"fx_{currency}.json"
+    if use_cache and _fresh(p, FUNDAMENTAL_TTL):
+        return json.loads(p.read_text())["rate"]
+    try:
+        hist = _yf().Ticker(f"{currency}IDR=X").history(period="5d")
+        rate = float(hist["Close"].dropna().iloc[-1])
+    except Exception as e:
+        log.warning("Kurs %s/IDR gagal diambil (%s); PBV emiten berlaporan %s dikosongkan", currency, e, currency)
+        return np.nan
+    p.write_text(json.dumps({"rate": rate}))
+    return rate
 

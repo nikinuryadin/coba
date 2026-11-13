@@ -110,16 +110,44 @@ def build_table(
     table.index.name = "code"
     if fundamentals is not None and not fundamentals.empty:
         table = table.join(fundamentals, how="left")
-        # Hitung ulang PER/PBV dari harga terkini bila EPS/BVPS tersedia
-        if "eps" in table:
-            per_live = table["close"] / table["eps"].where(table["eps"] > 0)
-            table["per"] = per_live.fillna(table["per"])
-        if "bvps" in table:
-            pbv_live = table["close"] / table["bvps"].where(table["bvps"] > 0)
-            table["pbv"] = pbv_live.fillna(table["pbv"])
-        if "eps" in table:
-            table["earnings_yield"] = table["eps"] / table["close"] * 100
+        _normalize_valuation(table)
     return table
+
+
+MAX_PLAUSIBLE_DIV_YIELD = 30.0  # di atas ini hampir pasti data salah
+
+
+def _normalize_valuation(table: pd.DataFrame) -> None:
+    """Hitung ulang PER/PBV/dividen dari harga terakhir, dalam rupiah.
+
+    Emiten berlaporan USD (ADRO, ITMG, PGAS, AMMN, dll.) diberi nilai buku per saham
+    oleh Yahoo dalam USD, padahal harganya dalam IDR -> dikonversi dengan kurs.
+    """
+    close = table["close"]
+    fx = table["fx_to_idr"] if "fx_to_idr" in table else pd.Series(1.0, index=table.index)
+    foreign = fx.ne(1.0)
+
+    if "bvps" in table:
+        bvps = table["bvps"] * fx  # NaN bila kurs tak tersedia
+        table["bvps"] = bvps
+        pbv_live = close / bvps.where(bvps > 0)
+        # priceToBook Yahoo untuk emiten berlaporan asing juga salah mata uang -> jangan dipakai
+        table["pbv"] = pbv_live.fillna(table["pbv"].where(~foreign))
+    if "eps" in table:
+        eps = table["eps"]
+        # EPS Yahoo biasanya sudah dalam IDR; konversi hanya bila jelas masih mata uang asing
+        looks_foreign = foreign & (close / eps.abs() > 2000)
+        eps = eps.where(~looks_foreign, eps * fx)
+        table["eps"] = eps
+        table["per"] = (close / eps.where(eps > 0)).fillna(table["per"])
+        table["earnings_yield"] = eps / close * 100
+
+    hist = table.get("div_yield_hist")
+    if hist is not None:
+        base = table["div_yield"] if "div_yield" in table else pd.Series(np.nan, index=table.index)
+        table["div_yield"] = hist.where(hist > 0.05, base)
+    if "div_yield" in table:
+        table["div_yield"] = table["div_yield"].where(table["div_yield"] <= MAX_PLAUSIBLE_DIV_YIELD)
 
 
 def needs_fundamentals(filters: list[str], sort: str | None = None) -> bool:
