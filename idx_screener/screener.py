@@ -77,7 +77,7 @@ PRESETS: dict[str, dict] = {
         "sort": "vol_ratio",
         "ascending": False,
         "columns": ["close", "chg_1d", "atr_pct", "vol_ratio", "value_avg20", "tick_pct",
-                    "rsi14", "cmf20", "stop", "stop_pct", "target"],
+                    "rsi14", "cmf20", "stop_dt", "stop_dt_pct", "target_dt"],
     },
     "swing": {
         "desc": "Swing pullback: tren naik (MA20 > MA50, di atas MA50), harga dekat MA20, RSI 40-60",
@@ -89,8 +89,8 @@ PRESETS: dict[str, dict] = {
                     "stop", "stop_pct", "target"],
     },
     "akumulasi": {
-        "desc": "Indikasi akumulasi: aliran dana masuk (CMF > 0.1, OBV naik) saat harga belum lari",
-        "filters": ["accumulation", "chg_1m < 10", "value_avg20 > 5e9"],
+        "desc": "Indikasi akumulasi kuat: CMF > 0.2, OBV naik, harga 1 bulan belum lari",
+        "filters": ["accumulation", "cmf20 > 0.2", "chg_1m < 10", "value_avg20 > 5e9"],
         "sort": "cmf20",
         "ascending": False,
         "columns": ["close", "chg_1m", "cmf20", "obv_up", "vol_ratio", "value_avg20", "rsi14",

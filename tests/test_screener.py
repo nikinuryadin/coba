@@ -201,3 +201,12 @@ def test_cmf_accumulation_vs_distribution():
     dist = pd.DataFrame({"Open": c2, "High": c2 * 1.03, "Low": c2 * 0.99, "Close": c2 * 0.992, "Volume": 1e6})
     t2 = compute_technicals(dist)
     assert t2["cmf20"] < -0.5 and t2["distribution"]
+
+
+def test_daytrade_stop_tighter_than_swing():
+    from idx_screener.indicators import tick_size
+    rng = np.random.default_rng(5)
+    t = compute_technicals(make_ohlcv(800 + rng.normal(0, 15, 120).cumsum()))
+    assert t["stop"] < t["stop_dt"] < t["close"] < t["target_dt"]
+    assert t["stop_dt"] % tick_size(t["stop_dt"]) == 0
+    assert abs(t["stop_dt_pct"]) < abs(t["stop_pct"])

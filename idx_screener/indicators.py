@@ -167,6 +167,15 @@ def compute_technicals(df: pd.DataFrame, cross_lookback: int = 5) -> dict:
     out["stop"] = stop
     out["stop_pct"] = (stop / last - 1) * 100 if np.isfinite(stop) else np.nan
     out["target"] = round_to_tick(last + 2 * risk, up=True) if np.isfinite(risk) and risk > 0 else np.nan
+    # Versi daytrade: stop 0,5x ATR harian (gerak intraday jauh lebih kecil dari ATR harian)
+    stop_dt = round_to_tick(last - 0.5 * a_last) if np.isfinite(a_last) else np.nan
+    if np.isfinite(stop_dt) and stop_dt >= last:  # ATR terlalu kecil -> minimal 1 tick
+        stop_dt = round_to_tick(last - tick_size(last))
+    risk_dt = last - stop_dt if np.isfinite(stop_dt) else np.nan
+    out["stop_dt"] = stop_dt
+    out["stop_dt_pct"] = (stop_dt / last - 1) * 100 if np.isfinite(stop_dt) else np.nan
+    out["target_dt"] = (round_to_tick(last + 2 * risk_dt, up=True)
+                        if np.isfinite(risk_dt) and risk_dt > 0 else np.nan)
     out["tick_pct"] = out["tick"] / last * 100 if last else np.nan
     out["dist_ma20"] = (last / out["ma20"] - 1) * 100 if out["ma20"] else np.nan
     # --- Proksi akumulasi/distribusi dari harga & volume (BUKAN data broker summary)

@@ -112,7 +112,8 @@ if filters:
     st.caption("Filter: " + "  •  ".join(filters))
 
 cols = ["name", "sector", "close", "chg_1d", "chg_1w", "chg_1m", "chg_3m", "rsi14", "vol_ratio",
-        "value_avg20", "atr_pct", "cmf20", "stop", "stop_pct", "target", "from_high_52w", "uptrend",
+        "value_avg20", "atr_pct", "cmf20", "stop", "stop_pct", "target", "stop_dt", "stop_dt_pct",
+        "target_dt", "from_high_52w", "uptrend",
         "per", "pbv", "roe", "der", "div_yield", "market_cap", "score"]
 show = result[[c for c in cols if c in result.columns]].copy()
 for c in ("value_avg20", "market_cap"):
@@ -140,6 +141,10 @@ st.dataframe(
         "stop": st.column_config.NumberColumn("Stop", format="%d", help="Harga - 1,5×ATR, dibulatkan ke fraksi"),
         "stop_pct": st.column_config.NumberColumn("Stop %", format="%.1f"),
         "target": st.column_config.NumberColumn("Target 2R", format="%d"),
+        "stop_dt": st.column_config.NumberColumn("Stop DT", format="%d",
+                                                 help="Stop daytrade: harga - 0,5×ATR (lebih ketat)"),
+        "stop_dt_pct": st.column_config.NumberColumn("Stop DT %", format="%.1f"),
+        "target_dt": st.column_config.NumberColumn("Target DT", format="%d"),
         "per": st.column_config.NumberColumn("PER", format="%.2f"),
         "pbv": st.column_config.NumberColumn("PBV", format="%.2f"),
         "roe": st.column_config.NumberColumn("ROE %", format="%.1f"),
@@ -162,6 +167,7 @@ if not result.empty:
     st.line_chart(df[["Close", "MA20", "MA50", "MA200"]].iloc[-252:])
     st.bar_chart(df["Volume"].iloc[-120:])
 
-st.caption("Stop/Target: stop = harga − 1,5×ATR(14), target = 2× jarak stop (risk:reward 1:2). "
+st.caption("Stop/Target (swing): stop = harga − 1,5×ATR(14), target = 2× jarak stop (risk:reward 1:2). "
+           "Stop/Target DT (daytrade): stop = harga − 0,5×ATR. "
            "CMF/akumulasi adalah proksi dari harga & volume harian, bukan data broker summary.")
 st.caption("Data dari Yahoo Finance (bisa tertunda ±15 menit / EOD). Bukan rekomendasi jual/beli.")

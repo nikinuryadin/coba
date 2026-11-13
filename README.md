@@ -60,12 +60,13 @@ bisa langsung dipakai (mis. `uptrend`, `golden_cross`). Beberapa `-f` digabung d
 | `macd_bullish` | MACD cross ke atas signal, harga > MA50 |
 | `daytrade` | Watchlist daytrade: nilai transaksi > Rp50 M/hari, ATR ≥ 2,5%, volume ≥ 1,2x, tick ≤ 1% harga |
 | `swing` | Pullback dalam tren naik: MA20 > MA50, harga ±3% dari MA20, RSI 40–60 |
-| `akumulasi` | CMF > 0,1 dan OBV naik, harga 1 bulan belum naik > 10% |
+| `akumulasi` | CMF > 0,2 dan OBV naik, harga 1 bulan belum naik > 10% |
 
 ### Rencana trading & proksi "bandar"
 
 - `stop` = harga − 1,5 × ATR(14), dibulatkan ke fraksi harga; `stop_pct` = jarak ke stop (%)
 - `target` = harga + 2 × jarak stop (risk:reward 1:2), dibulatkan ke fraksi harga
+- `stop_dt` / `stop_dt_pct` / `target_dt`: versi daytrade, stop = harga − 0,5 × ATR (lebih ketat)
 - `cmf20` (Chaikin Money Flow 20 hari), `obv_up`, `accumulation`, `distribution`:
   **proksi** tekanan beli/jual dari harga & volume harian. Ini **bukan** data broker summary,
   foreign flow, atau orderbook — cek itu di aplikasi sekuritas Anda.
