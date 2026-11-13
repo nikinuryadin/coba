@@ -71,6 +71,31 @@ PRESETS: dict[str, dict] = {
         "sort": "value_avg20",
         "ascending": False,
     },
+    "daytrade": {
+        "desc": "Watchlist daytrade: sangat likuid, gerak harian lebar, volume naik, tick kecil",
+        "filters": ["value_avg20 > 50e9", "atr_pct >= 2.5", "vol_ratio >= 1.2", "tick_pct <= 1"],
+        "sort": "vol_ratio",
+        "ascending": False,
+        "columns": ["close", "chg_1d", "atr_pct", "vol_ratio", "value_avg20", "tick_pct",
+                    "rsi14", "cmf20", "stop_dt", "stop_dt_pct", "target_dt"],
+    },
+    "swing": {
+        "desc": "Swing pullback: tren naik (MA20 > MA50, di atas MA50), harga dekat MA20, RSI 40-60",
+        "filters": ["above_ma50", "ma20 > ma50", "dist_ma20 >= -3", "dist_ma20 <= 3",
+                    "rsi14 >= 40", "rsi14 <= 60", "value_avg20 > 10e9"],
+        "sort": "chg_3m",
+        "ascending": False,
+        "columns": ["close", "chg_1w", "chg_3m", "rsi14", "dist_ma20", "cmf20", "value_avg20",
+                    "stop", "stop_pct", "target"],
+    },
+    "akumulasi": {
+        "desc": "Indikasi akumulasi kuat: CMF > 0.2, OBV naik, harga 1 bulan belum lari",
+        "filters": ["accumulation", "cmf20 > 0.2", "chg_1m < 10", "value_avg20 > 5e9"],
+        "sort": "cmf20",
+        "ascending": False,
+        "columns": ["close", "chg_1m", "cmf20", "obv_up", "vol_ratio", "value_avg20", "rsi14",
+                    "stop", "stop_pct", "target"],
+    },
     "macd_bullish": {
         "desc": "MACD baru cross ke atas signal, harga di atas MA50",
         "filters": ["macd_cross_up", "above_ma50", "value_avg20 > 2e9"],
@@ -110,16 +135,44 @@ def build_table(
     table.index.name = "code"
     if fundamentals is not None and not fundamentals.empty:
         table = table.join(fundamentals, how="left")
-        # Hitung ulang PER/PBV dari harga terkini bila EPS/BVPS tersedia
-        if "eps" in table:
-            per_live = table["close"] / table["eps"].where(table["eps"] > 0)
-            table["per"] = per_live.fillna(table["per"])
-        if "bvps" in table:
-            pbv_live = table["close"] / table["bvps"].where(table["bvps"] > 0)
-            table["pbv"] = pbv_live.fillna(table["pbv"])
-        if "eps" in table:
-            table["earnings_yield"] = table["eps"] / table["close"] * 100
+        _normalize_valuation(table)
     return table
+
+
+MAX_PLAUSIBLE_DIV_YIELD = 30.0  # di atas ini hampir pasti data salah
+
+
+def _normalize_valuation(table: pd.DataFrame) -> None:
+    """Hitung ulang PER/PBV/dividen dari harga terakhir, dalam rupiah.
+
+    Emiten berlaporan USD (ADRO, ITMG, PGAS, AMMN, dll.) diberi nilai buku per saham
+    oleh Yahoo dalam USD, padahal harganya dalam IDR -> dikonversi dengan kurs.
+    """
+    close = table["close"]
+    fx = table["fx_to_idr"] if "fx_to_idr" in table else pd.Series(1.0, index=table.index)
+    foreign = fx.ne(1.0)
+
+    if "bvps" in table:
+        bvps = table["bvps"] * fx  # NaN bila kurs tak tersedia
+        table["bvps"] = bvps
+        pbv_live = close / bvps.where(bvps > 0)
+        # priceToBook Yahoo untuk emiten berlaporan asing juga salah mata uang -> jangan dipakai
+        table["pbv"] = pbv_live.fillna(table["pbv"].where(~foreign))
+    if "eps" in table:
+        eps = table["eps"]
+        # EPS Yahoo biasanya sudah dalam IDR; konversi hanya bila jelas masih mata uang asing
+        looks_foreign = foreign & (close / eps.abs() > 2000)
+        eps = eps.where(~looks_foreign, eps * fx)
+        table["eps"] = eps
+        table["per"] = (close / eps.where(eps > 0)).fillna(table["per"])
+        table["earnings_yield"] = eps / close * 100
+
+    hist = table.get("div_yield_hist")
+    if hist is not None:
+        base = table["div_yield"] if "div_yield" in table else pd.Series(np.nan, index=table.index)
+        table["div_yield"] = hist.where(hist > 0.05, base)
+    if "div_yield" in table:
+        table["div_yield"] = table["div_yield"].where(table["div_yield"] <= MAX_PLAUSIBLE_DIV_YIELD)
 
 
 def needs_fundamentals(filters: list[str], sort: str | None = None) -> bool:

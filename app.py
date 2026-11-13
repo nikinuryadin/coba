@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
@@ -24,6 +26,13 @@ def load_fundamentals(codes: tuple[str, ...]):
 
 
 with st.sidebar:
+    if st.button("🔄 Perbarui data", type="primary", width="stretch",
+                 help="Ambil ulang harga & fundamental terbaru dari Yahoo Finance"):
+        data.clear_cache()
+        st.cache_data.clear()
+        st.session_state["refreshed"] = True
+        st.rerun()
+    fetched_slot = st.empty()
     st.header("Universe")
     custom = st.text_area("Kode saham (opsional, pisah koma)", placeholder="BBCA, BBRI, TLKM")
     sectors = st.multiselect("Sektor", SECTORS)
@@ -38,7 +47,8 @@ with st.sidebar:
     rsi_rng = st.slider("RSI(14)", 0, 100, (0, 100))
     min_value = st.number_input("Nilai transaksi rata-rata 20H minimal (Rp miliar)", 0.0, value=1.0, step=1.0)
     trend = st.multiselect("Kondisi tren", ["above_ma20", "above_ma50", "above_ma200", "uptrend",
-                                             "golden_cross", "macd_cross_up", "new_high_20d"])
+                                             "golden_cross", "macd_cross_up", "new_high_20d",
+                                             "accumulation", "obv_up"])
     if with_fund:
         max_per = st.number_input("PER maksimal (0 = abaikan)", 0.0, value=0.0)
         max_pbv = st.number_input("PBV maksimal (0 = abaikan)", 0.0, value=0.0)
@@ -50,6 +60,11 @@ codes = [c.strip().upper().removesuffix(".JK") for c in custom.replace("\n", ","
 codes = tuple(codes or UNIVERSE)
 
 prices = load_prices(codes, period)
+ts = data.cache_time()
+if ts:
+    fetched_slot.caption(f"Data diambil: {datetime.fromtimestamp(ts):%d %b %Y %H:%M}")
+if st.session_state.pop("refreshed", False):
+    st.toast("Data berhasil diperbarui", icon="✅")
 if not prices:
     st.error("Gagal mengambil data harga. Periksa koneksi internet.")
     st.stop()
@@ -97,8 +112,9 @@ if filters:
     st.caption("Filter: " + "  •  ".join(filters))
 
 cols = ["name", "sector", "close", "chg_1d", "chg_1w", "chg_1m", "chg_3m", "rsi14", "vol_ratio",
-        "value_avg20", "from_high_52w", "uptrend", "per", "pbv", "roe", "der", "div_yield",
-        "market_cap", "score"]
+        "value_avg20", "atr_pct", "cmf20", "stop", "stop_pct", "target", "stop_dt", "stop_dt_pct",
+        "target_dt", "from_high_52w", "uptrend",
+        "per", "pbv", "roe", "der", "div_yield", "market_cap", "score"]
 show = result[[c for c in cols if c in result.columns]].copy()
 for c in ("value_avg20", "market_cap"):
     if c in show:
@@ -118,6 +134,17 @@ st.dataframe(
         "vol_ratio": st.column_config.NumberColumn("Vol x", format="%.2f"),
         "value_avg20": st.column_config.NumberColumn("Nilai 20H (M)", format="%.1f"),
         "from_high_52w": st.column_config.NumberColumn("dr High52W %", format="%.1f"),
+        "atr_pct": st.column_config.NumberColumn("ATR %", format="%.1f",
+                                                 help="Rata-rata gerak harian (persen)"),
+        "cmf20": st.column_config.NumberColumn("CMF", format="%.2f",
+                                               help="Money flow 20H: >0.1 akumulasi, <-0.1 distribusi (proksi, bukan broker summary)"),
+        "stop": st.column_config.NumberColumn("Stop", format="%d", help="Harga - 1,5×ATR, dibulatkan ke fraksi"),
+        "stop_pct": st.column_config.NumberColumn("Stop %", format="%.1f"),
+        "target": st.column_config.NumberColumn("Target 2R", format="%d"),
+        "stop_dt": st.column_config.NumberColumn("Stop DT", format="%d",
+                                                 help="Stop daytrade: harga - 0,5×ATR (lebih ketat)"),
+        "stop_dt_pct": st.column_config.NumberColumn("Stop DT %", format="%.1f"),
+        "target_dt": st.column_config.NumberColumn("Target DT", format="%d"),
         "per": st.column_config.NumberColumn("PER", format="%.2f"),
         "pbv": st.column_config.NumberColumn("PBV", format="%.2f"),
         "roe": st.column_config.NumberColumn("ROE %", format="%.1f"),
@@ -140,4 +167,7 @@ if not result.empty:
     st.line_chart(df[["Close", "MA20", "MA50", "MA200"]].iloc[-252:])
     st.bar_chart(df["Volume"].iloc[-120:])
 
+st.caption("Stop/Target (swing): stop = harga − 1,5×ATR(14), target = 2× jarak stop (risk:reward 1:2). "
+           "Stop/Target DT (daytrade): stop = harga − 0,5×ATR. "
+           "CMF/akumulasi adalah proksi dari harga & volume harian, bukan data broker summary.")
 st.caption("Data dari Yahoo Finance (bisa tertunda ±15 menit / EOD). Bukan rekomendasi jual/beli.")

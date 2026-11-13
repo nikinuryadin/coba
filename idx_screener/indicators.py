@@ -60,6 +60,28 @@ def tick_size(price: float) -> int:
     return 25
 
 
+def round_to_tick(price: float, up: bool = False) -> float:
+    """Bulatkan harga ke fraksi harga IDX yang valid (ke bawah, atau ke atas bila up=True)."""
+    if not np.isfinite(price) or price <= 0:
+        return np.nan
+    t = tick_size(price)
+    q = price / t
+    return float((np.ceil(q - 1e-9) if up else np.floor(q + 1e-9)) * t)
+
+
+def cmf(high, low, close, volume, n: int = 20) -> pd.Series:
+    """Chaikin Money Flow: >0 tekanan beli (akumulasi), <0 tekanan jual (distribusi)."""
+    rng = (high - low).replace(0, np.nan)
+    mfm = ((close - low) - (high - close)) / rng
+    mfv = mfm.fillna(0) * volume
+    return mfv.rolling(n, min_periods=n).sum() / volume.rolling(n, min_periods=n).sum()
+
+
+def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
+    """On-Balance Volume."""
+    return (np.sign(close.diff()).fillna(0) * volume).cumsum()
+
+
 def _last(s: pd.Series) -> float:
     s = s.dropna()
     return float(s.iloc[-1]) if len(s) else np.nan
@@ -138,6 +160,41 @@ def compute_technicals(df: pd.DataFrame, cross_lookback: int = 5) -> dict:
         "new_high_20d": bool(len(close) > 20 and last >= close.iloc[-21:-1].max()),
         "bars": len(df),
     }
+    # --- Rencana trading berbasis ATR (stop 1,5x ATR, target 2R), dibulatkan ke fraksi harga
+    a_last = out["atr14"]
+    stop = round_to_tick(last - 1.5 * a_last) if np.isfinite(a_last) else np.nan
+    risk = last - stop if np.isfinite(stop) else np.nan
+    out["stop"] = stop
+    out["stop_pct"] = (stop / last - 1) * 100 if np.isfinite(stop) else np.nan
+    out["target"] = round_to_tick(last + 2 * risk, up=True) if np.isfinite(risk) and risk > 0 else np.nan
+    # Versi daytrade: stop 0,5x ATR harian (gerak intraday jauh lebih kecil dari ATR harian)
+    stop_dt = round_to_tick(last - 0.5 * a_last) if np.isfinite(a_last) else np.nan
+    if np.isfinite(stop_dt) and stop_dt >= last:  # ATR terlalu kecil -> minimal 1 tick
+        stop_dt = round_to_tick(last - tick_size(last))
+    risk_dt = last - stop_dt if np.isfinite(stop_dt) else np.nan
+    out["stop_dt"] = stop_dt
+    out["stop_dt_pct"] = (stop_dt / last - 1) * 100 if np.isfinite(stop_dt) else np.nan
+    out["target_dt"] = (round_to_tick(last + 2 * risk_dt, up=True)
+                        if np.isfinite(risk_dt) and risk_dt > 0 else np.nan)
+    out["tick_pct"] = out["tick"] / last * 100 if last else np.nan
+    out["dist_ma20"] = (last / out["ma20"] - 1) * 100 if out["ma20"] else np.nan
+    # --- Proksi akumulasi/distribusi dari harga & volume (BUKAN data broker summary)
+    c = cmf(high, low, close, vol, 20)
+    o = obv(close, vol)
+    o_ma = sma(o, 20)
+    out["cmf20"] = _last(c)
+    out["obv_up"] = bool(len(o_ma.dropna()) and o.iloc[-1] > o_ma.iloc[-1])
+    out["accumulation"] = bool(
+        np.isfinite(out["cmf20"]) and out["cmf20"] > 0.1 and out["obv_up"]
+    )
+    out["distribution"] = bool(
+        np.isfinite(out["cmf20"]) and out["cmf20"] < -0.1 and not out["obv_up"]
+    )
+    if "Dividends" in df:
+        since = df.index[-1] - pd.Timedelta(days=365)
+        div_ttm = float(df.loc[df.index > since, "Dividends"].fillna(0).sum())
+        out["div_ttm"] = div_ttm
+        out["div_yield_hist"] = div_ttm / last * 100 if last else np.nan
     out["above_ma20"] = bool(last > out["ma20"]) if not np.isnan(out["ma20"]) else False
     out["above_ma50"] = bool(last > out["ma50"]) if not np.isnan(out["ma50"]) else False
     out["above_ma200"] = bool(last > out["ma200"]) if not np.isnan(out["ma200"]) else False

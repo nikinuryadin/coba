@@ -3,7 +3,15 @@
 Screener saham Bursa Efek Indonesia (IDX) berbasis Python — data dari Yahoo Finance (`yfinance`).
 Tersedia sebagai **CLI** dan **web UI (Streamlit)**.
 
-## Instalasi
+## Instalasi cepat (Windows)
+
+1. Pasang Python 3.10+ dari https://www.python.org/downloads/ (centang **Add Python to PATH**).
+2. Unduh repo ini (tombol **Code → Download ZIP**) lalu ekstrak.
+3. Klik dua kali **`install.bat`** (sekali saja, beberapa menit).
+4. Klik dua kali **`jalankan.bat`** — screener terbuka di browser (`http://localhost:8501`).
+   Biarkan jendela hitamnya terbuka; tutup untuk berhenti.
+
+## Instalasi manual
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -50,6 +58,20 @@ bisa langsung dipakai (mis. `uptrend`, `golden_cross`). Beberapa `-f` digabung d
 | `volume_spike` | Volume > 2x rata-rata 20 hari |
 | `golden_cross` | MA50 memotong ke atas MA200 dalam 5 hari terakhir |
 | `macd_bullish` | MACD cross ke atas signal, harga > MA50 |
+| `daytrade` | Watchlist daytrade: nilai transaksi > Rp50 M/hari, ATR ≥ 2,5%, volume ≥ 1,2x, tick ≤ 1% harga |
+| `swing` | Pullback dalam tren naik: MA20 > MA50, harga ±3% dari MA20, RSI 40–60 |
+| `akumulasi` | CMF > 0,2 dan OBV naik, harga 1 bulan belum naik > 10% |
+
+### Rencana trading & proksi "bandar"
+
+- `stop` = harga − 1,5 × ATR(14), dibulatkan ke fraksi harga; `stop_pct` = jarak ke stop (%)
+- `target` = harga + 2 × jarak stop (risk:reward 1:2), dibulatkan ke fraksi harga
+- `stop_dt` / `stop_dt_pct` / `target_dt`: versi daytrade, stop = harga − 0,5 × ATR (lebih ketat)
+- `cmf20` (Chaikin Money Flow 20 hari), `obv_up`, `accumulation`, `distribution`:
+  **proksi** tekanan beli/jual dari harga & volume harian. Ini **bukan** data broker summary,
+  foreign flow, atau orderbook — cek itu di aplikasi sekuritas Anda.
+- Data harian (EOD): untuk daytrade, pakai screener untuk menyusun watchlist malam sebelumnya,
+  lalu tentukan entry di aplikasi sekuritas (orderbook, running trade, chart intraday).
 
 ### Kolom utama
 
@@ -73,8 +95,10 @@ Default ±100 saham likuid (LQ45/IDX80/Kompas100) di `idx_screener/tickers.py`. 
 
 - Data Yahoo Finance bersifat EOD/tertunda dan fundamental kadang kosong/terlambat untuk emiten IDX.
   Verifikasi dengan laporan keuangan resmi (idx.co.id) sebelum mengambil keputusan.
-- Cache disimpan di `.cache/` (harga 4 jam, fundamental 24 jam). Pakai `--no-cache` untuk menyegarkan.
-- Bukan rekomendasi jual/beli.
+- Cache disimpan di `.cache/` (harga 4 jam, fundamental 24 jam). Di web UI klik **🔄 Perbarui data**;
+  di CLI pakai `--no-cache` untuk menyegarkan.
+- Biaya transaksi ±0,4% per beli-jual sudah harus diperhitungkan, terutama untuk daytrade.
+- Bukan rekomendasi jual/beli. Tidak ada screener yang menjamin profit.
 
 ## Tes
 

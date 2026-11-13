@@ -49,7 +49,10 @@ Teknikal : close, chg_1d, chg_1w, chg_1m, chg_3m, chg_6m, chg_1y (persen)
            volume, vol_avg20, vol_ratio, value, value_avg20 (Rp nilai transaksi)
            ma5, ma20, ma50, ma200, rsi14, macd, macd_signal, macd_hist, atr14, atr_pct,
            bb_upper, bb_lower, high_52w, low_52w, from_high_52w, from_low_52w (persen),
-           volatility_1y, tick, lot_value
+           volatility_1y, tick, tick_pct, lot_value, dist_ma20 (persen dari MA20)
+Trading  : stop (harga - 1.5xATR, dibulatkan fraksi), stop_pct, target (2R)
+Bandar*  : cmf20 (Chaikin Money Flow), obv_up, accumulation, distribution
+           *proksi dari harga & volume, BUKAN broker summary / data asing
 Boolean  : above_ma20, above_ma50, above_ma200, uptrend, golden_cross, death_cross,
            macd_cross_up, macd_cross_down, ma20_cross_up, new_high_20d
 Fundamen : per, forward_per, pbv, eps, bvps, roe, roa, npm, der (x), div_yield,
@@ -84,12 +87,14 @@ def main(argv=None) -> int:
     filters = list(args.filter)
     sort, ascending = args.sort, args.asc
     preset_fund = False
+    preset_cols = None
     if args.preset:
         cfg = PRESETS[args.preset]
         filters = cfg["filters"] + filters
         if not sort:
             sort, ascending = cfg["sort"], cfg["ascending"]
         preset_fund = cfg.get("needs_fundamentals", False)
+        preset_cols = cfg.get("columns")
     sort = sort or "score"
 
     codes = load_codes(args)
@@ -124,7 +129,12 @@ def main(argv=None) -> int:
         print("Filter: " + " AND ".join(filters))
     print(f"Urut   : {sort} ({'naik' if ascending else 'turun'})\n")
 
-    columns = args.columns.split(",") if args.columns else DEFAULT_COLUMNS + ["score"]
+    if args.columns:
+        columns = args.columns.split(",")
+    elif preset_cols:
+        columns = ["sector"] + list(preset_cols)
+    else:
+        columns = DEFAULT_COLUMNS + ["score"]
     if sort not in columns:
         columns.append(sort)
     if result.empty:
