@@ -210,3 +210,31 @@ def test_daytrade_stop_tighter_than_swing():
     assert t["stop"] < t["stop_dt"] < t["close"] < t["target_dt"]
     assert t["stop_dt"] % tick_size(t["stop_dt"]) == 0
     assert abs(t["stop_dt_pct"]) < abs(t["stop_pct"])
+
+
+def test_ogdo_signal_and_history():
+    from idx_screener.indicators import gap_stats
+    idx = pd.bdate_range("2025-01-01", periods=6)
+    #            hari:   0     1     2     3     4     5
+    close = pd.Series([1000, 1000, 1000, 1000, 1000, 960], index=idx, dtype=float)
+    open_ = pd.Series([1000, 950, 1000, 880, 1000, 950], index=idx, dtype=float)
+    high = pd.Series([1000, 1010, 1000, 900, 1000, 1000], index=idx, dtype=float)
+    df = pd.DataFrame({"Open": open_, "High": high, "Low": open_ * 0.98, "Close": close, "Volume": 1e6})
+    g = gap_stats(df)
+    # hari terakhir: open 950 vs close kemarin 1000 -> -5% -> OGDO
+    assert g["gap_pct"] == pytest.approx(-5)
+    assert g["ogdo"] and g["gap_filled"]
+    assert g["oc_pct"] == pytest.approx((960 / 950 - 1) * 100)
+    # kejadian: hari 1 (-5%, close>open, fill), hari 5 (-5%, close>open, fill); hari 3 (-12%) di luar rentang
+    assert g["ogdo_n"] == 2
+    assert g["ogdo_win"] == pytest.approx(100)
+    assert g["ogdo_fill"] == pytest.approx(100)
+
+
+def test_ogdo_boundaries():
+    from idx_screener.indicators import gap_stats
+    for o, expected in [(970, True), (900, True), (975, False), (895, False)]:
+        idx = pd.bdate_range("2025-01-01", periods=2)
+        df = pd.DataFrame({"Open": [1000.0, o], "High": [1000.0, 1000.0], "Low": [990.0, o],
+                           "Close": [1000.0, 990.0], "Volume": [1e6, 1e6]}, index=idx)
+        assert gap_stats(df)["ogdo"] is expected, o

@@ -28,6 +28,9 @@ LABELS = {
     "div_yield": "Div%", "market_cap": "MCap", "der": "DER", "npm": "NPM%", "score": "Skor",
     "atr_pct": "ATR%", "tick_pct": "Tick%", "cmf20": "CMF", "obv_up": "OBV↑", "dist_ma20": "vsMA20%",
     "stop": "Stop", "stop_pct": "Stop%", "target": "Target",
+    "prev_close": "CloseKmrn", "open": "Open", "gap_pct": "Gap%", "oc_pct": "Open→Close%",
+    "gap_filled": "GapTutup", "ogdo_n": "OGDO#", "ogdo_win": "OGDOWin%", "ogdo_fill": "OGDOFill%",
+    "ogdo_avg_oc": "OGDOAvg%",
     "stop_dt": "StopDT", "stop_dt_pct": "StopDT%", "target_dt": "TargetDT",
 }
 
@@ -41,7 +44,7 @@ def format_table(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
         s = out[c]
         if c in MONEY_COLS:
             out[c] = s.map(rupiah_short)
-        elif c in ("close", "stop", "target", "stop_dt", "target_dt"):
+        elif c in ("close", "stop", "target", "stop_dt", "target_dt", "prev_close", "open"):
             out[c] = s.map(lambda v: "-" if pd.isna(v) else f"{v:,.0f}")
         elif pd.api.types.is_bool_dtype(s):
             out[c] = s.map({True: "ya", False: "-"})

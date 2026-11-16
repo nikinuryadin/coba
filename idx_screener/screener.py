@@ -96,6 +96,15 @@ PRESETS: dict[str, dict] = {
         "columns": ["close", "chg_1m", "cmf20", "obv_up", "vol_ratio", "value_avg20", "rsi14",
                     "stop", "stop_pct", "target"],
     },
+    "ogdo": {
+        "desc": "Open Gap Down: open hari ini -3% s/d -10% dari close kemarin",
+        "filters": ["ogdo"],
+        "sort": "gap_pct",
+        "ascending": True,
+        "columns": ["prev_close", "open", "close", "gap_pct", "oc_pct", "gap_filled", "vol_ratio",
+                    "value_avg20", "rsi14", "ogdo_n", "ogdo_win", "ogdo_fill", "ogdo_avg_oc",
+                    "stop_dt", "target_dt"],
+    },
     "macd_bullish": {
         "desc": "MACD baru cross ke atas signal, harga di atas MA50",
         "filters": ["macd_cross_up", "above_ma50", "value_avg20 > 2e9"],

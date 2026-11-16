@@ -60,6 +60,34 @@ def tick_size(price: float) -> int:
     return 25
 
 
+# OGDO (Open Gap Down): open hari ini vs close kemarin, dalam persen
+OGDO_MIN, OGDO_MAX = -10.0, -3.0
+
+
+def gap_stats(df: pd.DataFrame, lo: float = OGDO_MIN, hi: float = OGDO_MAX) -> dict:
+    """Sinyal gap hari terakhir + statistik historis kejadian gap dalam rentang [lo, hi]."""
+    o, c, h = df["Open"], df["Close"], df["High"]
+    pc = c.shift(1)
+    gap = (o / pc - 1) * 100
+    gap = gap.where((o > 0) & (pc > 0))
+    oc = (c / o - 1) * 100
+    last_gap = float(gap.iloc[-1]) if len(gap) and pd.notna(gap.iloc[-1]) else np.nan
+    ev = gap.between(lo, hi)
+    n = int(ev.sum())
+    return {
+        "open": float(o.iloc[-1]),
+        "prev_close": float(pc.iloc[-1]) if len(pc) > 1 else np.nan,
+        "gap_pct": last_gap,
+        "oc_pct": float(oc.iloc[-1]) if pd.notna(oc.iloc[-1]) else np.nan,  # open -> close hari ini
+        "gap_filled": bool(len(pc) > 1 and h.iloc[-1] >= pc.iloc[-1]),
+        "ogdo": bool(np.isfinite(last_gap) and lo <= last_gap <= hi),
+        "ogdo_n": n,  # jumlah kejadian OGDO dalam data
+        "ogdo_win": float((c[ev] > o[ev]).mean() * 100) if n else np.nan,  # % close > open
+        "ogdo_fill": float((h[ev] >= pc[ev]).mean() * 100) if n else np.nan,  # % gap tertutup
+        "ogdo_avg_oc": float(oc[ev].mean()) if n else np.nan,  # rata2 open->close (%)
+    }
+
+
 def round_to_tick(price: float, up: bool = False) -> float:
     """Bulatkan harga ke fraksi harga IDX yang valid (ke bawah, atau ke atas bila up=True)."""
     if not np.isfinite(price) or price <= 0:
@@ -159,6 +187,7 @@ def compute_technicals(df: pd.DataFrame, cross_lookback: int = 5) -> dict:
         "ma20_cross_up": _crossed_up(close, ma20, cross_lookback),
         "new_high_20d": bool(len(close) > 20 and last >= close.iloc[-21:-1].max()),
         "bars": len(df),
+        **gap_stats(df),
     }
     # --- Rencana trading berbasis ATR (stop 1,5x ATR, target 2R), dibulatkan ke fraksi harga
     a_last = out["atr14"]

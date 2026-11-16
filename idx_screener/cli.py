@@ -50,6 +50,8 @@ Teknikal : close, chg_1d, chg_1w, chg_1m, chg_3m, chg_6m, chg_1y (persen)
            ma5, ma20, ma50, ma200, rsi14, macd, macd_signal, macd_hist, atr14, atr_pct,
            bb_upper, bb_lower, high_52w, low_52w, from_high_52w, from_low_52w (persen),
            volatility_1y, tick, tick_pct, lot_value, dist_ma20 (persen dari MA20)
+OGDO     : gap_pct (open vs close kemarin, %), oc_pct (open->close %), gap_filled, ogdo,
+           ogdo_n / ogdo_win / ogdo_fill / ogdo_avg_oc (statistik historis gap -3%..-10%)
 Trading  : stop (harga - 1.5xATR, dibulatkan fraksi), stop_pct, target (2R)
 Bandar*  : cmf20 (Chaikin Money Flow), obv_up, accumulation, distribution
            *proksi dari harga & volume, BUKAN broker summary / data asing

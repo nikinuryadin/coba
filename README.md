@@ -60,6 +60,7 @@ bisa langsung dipakai (mis. `uptrend`, `golden_cross`). Beberapa `-f` digabung d
 | `macd_bullish` | MACD cross ke atas signal, harga > MA50 |
 | `daytrade` | Watchlist daytrade: nilai transaksi > Rp50 M/hari, ATR ≥ 2,5%, volume ≥ 1,2x, tick ≤ 1% harga |
 | `swing` | Pullback dalam tren naik: MA20 > MA50, harga ±3% dari MA20, RSI 40–60 |
+| `ogdo` | Open Gap Down: open hari ini −3% s/d −10% dari close kemarin, plus statistik historis (jumlah kejadian, % close > open, % gap tertutup) |
 | `akumulasi` | CMF > 0,2 dan OBV naik, harga 1 bulan belum naik > 10% |
 
 ### Rencana trading & proksi "bandar"

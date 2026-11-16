@@ -115,6 +115,8 @@ cols = ["name", "sector", "close", "chg_1d", "chg_1w", "chg_1m", "chg_3m", "rsi1
         "value_avg20", "atr_pct", "cmf20", "stop", "stop_pct", "target", "stop_dt", "stop_dt_pct",
         "target_dt", "from_high_52w", "uptrend",
         "per", "pbv", "roe", "der", "div_yield", "market_cap", "score"]
+if preset in PRESETS and PRESETS[preset].get("columns"):
+    cols = ["name", "sector"] + PRESETS[preset]["columns"] + ["score"]
 show = result[[c for c in cols if c in result.columns]].copy()
 for c in ("value_avg20", "market_cap"):
     if c in show:
@@ -141,6 +143,18 @@ st.dataframe(
         "stop": st.column_config.NumberColumn("Stop", format="%d", help="Harga - 1,5×ATR, dibulatkan ke fraksi"),
         "stop_pct": st.column_config.NumberColumn("Stop %", format="%.1f"),
         "target": st.column_config.NumberColumn("Target 2R", format="%d"),
+        "prev_close": st.column_config.NumberColumn("Close kmrn", format="%d"),
+        "open": st.column_config.NumberColumn("Open", format="%d"),
+        "gap_pct": st.column_config.NumberColumn("Gap %", format="%.2f", help="Open hari ini vs close kemarin"),
+        "oc_pct": st.column_config.NumberColumn("Open→Close %", format="%.2f"),
+        "gap_filled": st.column_config.CheckboxColumn("Gap tertutup", help="High hari ini ≥ close kemarin"),
+        "ogdo_n": st.column_config.NumberColumn("OGDO #", help="Jumlah kejadian gap -3%..-10% dalam data"),
+        "ogdo_win": st.column_config.NumberColumn("OGDO win %", format="%.0f",
+                                                  help="% kejadian OGDO yang close > open di hari itu"),
+        "ogdo_fill": st.column_config.NumberColumn("OGDO fill %", format="%.0f",
+                                                   help="% kejadian OGDO yang gap-nya tertutup di hari itu"),
+        "ogdo_avg_oc": st.column_config.NumberColumn("OGDO avg %", format="%.2f",
+                                                     help="Rata-rata open→close saat OGDO"),
         "stop_dt": st.column_config.NumberColumn("Stop DT", format="%d",
                                                  help="Stop daytrade: harga - 0,5×ATR (lebih ketat)"),
         "stop_dt_pct": st.column_config.NumberColumn("Stop DT %", format="%.1f"),
